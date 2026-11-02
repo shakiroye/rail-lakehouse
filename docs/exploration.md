@@ -155,9 +155,9 @@ Un aperçu calculé en fin de notebook confirme que les indicateurs sont calcula
   - le BOM est déjà géré par `normalize_header` (`utf-8-sig`).
 - **Étape 4 (staging) :**
   - utiliser les noms de colonnes réels ;
-  - écarter les trois `commentaire_*` et la colonne « concurrencée par vol » ;
-  - borner les trains circulés à 0.
+  - écarter les trois `commentaire_*` et la colonne « concurrencée par vol ».
 - **Étape 5 (marts) :**
+  - borner les trains circulés à 0 (calcul fait dans le modèle intermediate, pas en staging) ;
   - corriger `cause_dominante` pour le cas où toutes les causes valent 0 ;
   - garder le service dans `liaison_id` et documenter le cas Paris ↔ Barcelone ;
   - `dim_mois` peut démarrer en 2018-01 au lieu de 2015.

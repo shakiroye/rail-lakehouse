@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: stg_sncf__regularite_tgv
+    description: >
+      Régularité TGV typée et nettoyée. Grain : un mois x un service x une liaison (gare de départ, gare d'arrivée).
+      Seul le dernier fichier chargé en bronze est conservé : il contient tout l'historique et intègre les corrections de la source.
+      Les colonnes de commentaires et le retard moyen « si liaison concurrencée par vol » sont écartés (voir docs/exploration.md).
+    columns:
+      - name: mois
+        description: "Premier jour du mois observé"
+      - name: service
+        description: "NATIONAL ou INTERNATIONAL. Une même liaison peut changer de service (Paris Lyon - Barcelona en 2025-10)."
+      - name: gare_depart
+        description: "Nom normalisé de la gare de départ (majuscules, espaces simples)"
+      - name: gare_arrivee
+        description: "Nom normalisé de la gare d'arrivée (majuscules, espaces simples)"
+      - name: duree_moyenne_min
+        description: "Durée moyenne du trajet, en minutes. Vaut 0 quand aucun train n'était prévu (2020)."
+      - name: nb_trains_prevus
+        description: "Nombre de trains programmés sur la liaison ce mois-là"
+      - name: nb_annulations
+        description: "Nombre de trains annulés. Peut dépasser nb_trains_prevus quand la liaison est suspendue (avril à juin 2020)."
+      - name: nb_trains_retard_depart
+        description: "Nombre de trains partis en retard"
+      - name: retard_moyen_depart_min
+        description: "Retard moyen au départ des seuls trains en retard, en minutes"
+      - name: retard_moyen_tous_trains_depart_min
+        description: "Retard moyen au départ de tous les trains, en minutes. Négatif quand les trains partent en avance."
+      - name: nb_trains_retard_arrivee
+        description: "Nombre de trains arrivés en retard"
+      - name: retard_moyen_arrivee_min
+        description: "Retard moyen à l'arrivée des seuls trains en retard, en minutes : quand un train est en retard, de combien ?"
+      - name: retard_moyen_tous_trains_arrivee_min
+        description: "Retard moyen à l'arrivée de tous les trains, en minutes. Négatif quand les trains arrivent en avance."
+      - name: nb_trains_retard_sup_15
+        description: "Nombre de trains arrivés avec plus de 15 minutes de retard"
+      - name: nb_trains_retard_sup_30
+        description: "Nombre de trains arrivés avec plus de 30 minutes de retard. Inexploitable de 2025-01 à 2025-03 (valeurs négatives ou inférieures au seuil 60 min)."
+      - name: nb_trains_retard_sup_60
+        description: "Nombre de trains arrivés avec plus de 60 minutes de retard"
+      - name: pct_cause_externe
+        description: "Part des retards due à des causes externes (météo, obstacles, malveillance, mouvements sociaux...), en %"
+      - name: pct_cause_infrastructure
+        description: "Part des retards due à l'infrastructure (travaux, voies, signalisation...), en %"
+      - name: pct_cause_gestion_trafic
+        description: "Part des retards due à la gestion du trafic (circulation, interactions entre réseaux...), en %"
+      - name: pct_cause_materiel_roulant
+        description: "Part des retards due au matériel roulant, en %"
+      - name: pct_cause_gestion_gare
+        description: "Part des retards due à la gestion en gare et à la réutilisation de matériel, en %"
+      - name: pct_cause_prise_en_charge_voyageurs
+        description: "Part des retards due à la prise en charge des voyageurs (affluence, personnes à mobilité réduite, correspondances), en %"
+      - name: _source_file
+        description: "Chemin du fichier chargé en bronze (dernier instantané)"
+      - name: _ingested_at
+        description: "Date et heure du chargement en bronze"
