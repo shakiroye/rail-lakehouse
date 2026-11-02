@@ -52,7 +52,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['NATIONAL', 'INTERNATIONAL']
+                values: ['NATIONAL']
       - name: gare_depart
         description: "Nom normalisé de la gare de départ (majuscules, espaces simples)"
         data_tests:
