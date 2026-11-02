@@ -1,10 +1,14 @@
-"""Example Dags test. This test ensures that all Dags have tags, retries set to two, and no import errors. This is an example pytest and may not be fit the context of your Dags. Feel free to add and remove tests."""
+"""Tests d'intégrité des Dags (généré par Astro, adapté) : import sans erreur, tags et retries."""
 
 import os
 import logging
 from contextlib import contextmanager
 import pytest
-from airflow.models import DagBag
+
+# Cosmos met en cache son "dbt ls" dans une Variable Airflow : sous pytest, il n'y a pas de base Airflow
+os.environ["AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS"] = "False"
+
+from airflow.models import DagBag  # noqa: E402
 
 
 @contextmanager

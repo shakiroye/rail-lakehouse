@@ -1,1 +1,5 @@
-# Astro Runtime includes the following pre-installed providers packages: https://www.astronomer.io/docs/astro/runtime-image-architecture#provider-packages
+# Dépendances côté Airflow (dbt est installé à part, dans le virtualenv du Dockerfile)
+astronomer-cosmos==1.15.1
+databricks-sdk==0.117.0
+databricks-sql-connector==4.4.0
+requests

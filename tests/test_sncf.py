@@ -23,7 +23,10 @@ def test_count_records_gere_les_commentaires_multilignes():
     assert count_records(raw) == 2
 
 
-def test_download_refuse_un_fichier_vide(requests_mock):
-    requests_mock.get("https://exemple.fr/f.csv", content=b"a;b\n")
-    with pytest.raises(ValueError):
-        download("https://exemple.fr/f.csv")
+def test_download_refuse_un_fichier_vide():
+    # requests-mock n'est pas dans l'image Airflow : test ignoré par "astro dev pytest", exécuté en local et en CI
+    requests_mock = pytest.importorskip("requests_mock")
+    with requests_mock.Mocker() as m:
+        m.get("https://exemple.fr/f.csv", content=b"a;b\n")
+        with pytest.raises(ValueError):
+            download("https://exemple.fr/f.csv")
