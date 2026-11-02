@@ -6,8 +6,10 @@ models:
     columns:
       - name: gare_id
         description: "Clé de substitution : hash du nom normalisé de la gare"
+        data_tests: [unique, not_null]
       - name: nom_gare
         description: "Nom normalisé de la gare. Certaines entrées regroupent plusieurs gares (ITALIE)."
+        data_tests: [unique, not_null]
       - name: est_gare_parisienne
         description: "Vrai si le nom commence par PARIS"
 
@@ -18,14 +20,30 @@ models:
     columns:
       - name: liaison_id
         description: "Clé de substitution : hash de (service, gare_depart, gare_arrivee)"
+        data_tests: [unique, not_null]
       - name: service
         description: "NATIONAL ou INTERNATIONAL"
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['NATIONAL', 'INTERNATIONAL']
       - name: gare_depart_id
         description: "Clé de la gare de départ (dim_gare)"
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_gare')
+                field: gare_id
       - name: gare_arrivee_id
         description: "Clé de la gare d'arrivée (dim_gare)"
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_gare')
+                field: gare_id
       - name: libelle_liaison
         description: "Libellé lisible : « GARE DE DÉPART > GARE D'ARRIVÉE »"
+        data_tests: [not_null]
       - name: duree_moyenne_min
         description: "Durée moyenne du trajet la plus récente connue, en minutes (mois sans train exclus)"
       - name: premier_mois
@@ -38,6 +56,7 @@ models:
     columns:
       - name: mois
         description: "Premier jour du mois"
+        data_tests: [unique, not_null]
       - name: annee
         description: "Année"
       - name: trimestre
@@ -54,21 +73,72 @@ models:
       Faits de régularité. Grain : un mois x une liaison.
       Incrémental (merge sur liaison_id et mois) : chaque exécution retraite les 3 derniers mois connus
       (variable lookback_mois) pour intégrer les corrections de la source. --full-refresh reconstruit tout.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [liaison_id, mois]
+      - dbt_utils.expression_is_true:
+          name: fct_regularite_retards_inf_circules
+          arguments:
+            expression: "nb_trains_retard_arrivee <= nb_trains_circules"
+          config:
+            severity: warn
+      - dbt_utils.expression_is_true:
+          name: fct_regularite_seuils_retard_coherents
+          arguments:
+            expression: >
+              nb_trains_retard_sup_60 <= nb_trains_retard_sup_30
+              and nb_trains_retard_sup_30 <= nb_trains_retard_sup_15
+              and nb_trains_retard_sup_15 <= nb_trains_retard_arrivee
+          config:
+            severity: warn   # environ 390 lignes, dont 354 au T1 2025 (colonne > 30 min inexploitable)
     columns:
       - name: liaison_id
         description: "Clé de la liaison (dim_liaison)"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_liaison')
+                field: liaison_id
       - name: gare_depart_id
         description: "Clé de la gare de départ (dim_gare)"
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_gare')
+                field: gare_id
       - name: gare_arrivee_id
         description: "Clé de la gare d'arrivée (dim_gare)"
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_gare')
+                field: gare_id
       - name: mois
         description: "Premier jour du mois observé (dim_mois)"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_mois')
+                field: mois
       - name: nb_trains_prevus
         description: "Nombre de trains programmés"
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
       - name: nb_annulations
         description: "Nombre de trains annulés"
       - name: nb_trains_circules
         description: "Trains prévus moins trains annulés, borné à 0"
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
       - name: nb_trains_retard_arrivee
         description: "Nombre de trains arrivés en retard"
       - name: nb_trains_retard_sup_15
@@ -81,12 +151,31 @@ models:
         description: "Retard moyen à l'arrivée des seuls trains en retard, en minutes"
       - name: taux_annulation
         description: "nb_annulations / nb_trains_prevus"
+        data_tests: &taux
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 1
       - name: taux_ponctualite_arrivee
         description: "1 - nb_trains_retard_arrivee / nb_trains_circules"
+        data_tests: *taux
       - name: part_retards_sup_30
         description: "nb_trains_retard_sup_30 / nb_trains_circules"
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              name: fct_regularite_part_retards_sup_30_bornee
+              arguments:
+                min_value: 0
+                max_value: 1
+              config:
+                severity: warn   # négative au T1 2025, héritée de nb_trains_retard_sup_30
       - name: cause_dominante
         description: "Cause de retard au pourcentage le plus élevé, NULL sans retard ou sans cause renseignée"
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Externe', 'Infrastructure', 'Gestion du trafic', 'Matériel roulant',
+                         'Gestion en gare', 'Prise en charge voyageurs']
       - name: pct_cause_externe
         description: "Part des retards due à des causes externes, en %"
       - name: pct_cause_infrastructure

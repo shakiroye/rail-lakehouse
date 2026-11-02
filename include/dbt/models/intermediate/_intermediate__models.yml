@@ -22,3 +22,40 @@ models:
         description: "nb_trains_retard_sup_30 / nb_trains_circules. Non fiable de 2025-01 à 2025-03."
       - name: cause_dominante
         description: "Cause dont le pourcentage est le plus élevé. NULL sans retard, ou quand toutes les causes valent 0."
+
+unit_tests:
+  - name: test_taux_et_division_par_zero
+    description: >
+      Taux calculés sur des cas construits à la main, dont une liaison entièrement annulée
+      et une liaison suspendue avec plus d'annulations que de trains prévus (cas d'avril 2020).
+    model: int_regularite__indicateurs
+    given:
+      - input: ref('stg_sncf__regularite_tgv')
+        rows:
+          - {service: NATIONAL, gare_depart: A, gare_arrivee: B, nb_trains_prevus: 100, nb_annulations: 20, nb_trains_retard_arrivee: 8}
+          - {service: NATIONAL, gare_depart: A, gare_arrivee: C, nb_trains_prevus: 50, nb_annulations: 50, nb_trains_retard_arrivee: 0}
+          - {service: NATIONAL, gare_depart: A, gare_arrivee: D, nb_trains_prevus: 0, nb_annulations: 8, nb_trains_retard_arrivee: 0}
+    expect:
+      rows:
+        - {gare_arrivee: B, nb_trains_circules: 80, taux_annulation: 0.2, taux_ponctualite_arrivee: 0.9}
+        - {gare_arrivee: C, nb_trains_circules: 0, taux_annulation: 1.0, taux_ponctualite_arrivee: null}
+        - {gare_arrivee: D, nb_trains_circules: 0, taux_annulation: null, taux_ponctualite_arrivee: null}
+
+  - name: test_cause_dominante
+    description: >
+      Cause dominante : la plus forte part, NULL sans retard, NULL quand toutes les causes valent 0
+      (cas de 2018-05 à 2018-08), et en cas d'égalité la première dans l'ordre de la liste.
+    model: int_regularite__indicateurs
+    given:
+      - input: ref('stg_sncf__regularite_tgv')
+        rows:
+          - {gare_arrivee: B, nb_trains_retard_arrivee: 10, pct_cause_externe: 30, pct_cause_infrastructure: 40, pct_cause_gestion_trafic: 10, pct_cause_materiel_roulant: 10, pct_cause_gestion_gare: 5, pct_cause_prise_en_charge_voyageurs: 5}
+          - {gare_arrivee: C, nb_trains_retard_arrivee: 0, pct_cause_externe: 0, pct_cause_infrastructure: 0, pct_cause_gestion_trafic: 0, pct_cause_materiel_roulant: 0, pct_cause_gestion_gare: 0, pct_cause_prise_en_charge_voyageurs: 0}
+          - {gare_arrivee: D, nb_trains_retard_arrivee: 12, pct_cause_externe: 0, pct_cause_infrastructure: 0, pct_cause_gestion_trafic: 0, pct_cause_materiel_roulant: 0, pct_cause_gestion_gare: 0, pct_cause_prise_en_charge_voyageurs: 0}
+          - {gare_arrivee: E, nb_trains_retard_arrivee: 4, pct_cause_externe: 50, pct_cause_infrastructure: 0, pct_cause_gestion_trafic: 50, pct_cause_materiel_roulant: 0, pct_cause_gestion_gare: 0, pct_cause_prise_en_charge_voyageurs: 0}
+    expect:
+      rows:
+        - {gare_arrivee: B, cause_dominante: Infrastructure}
+        - {gare_arrivee: C, cause_dominante: null}
+        - {gare_arrivee: D, cause_dominante: null}
+        - {gare_arrivee: E, cause_dominante: Externe}

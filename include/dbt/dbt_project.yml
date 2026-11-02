@@ -27,3 +27,8 @@ models:
 seeds:
   rail_lakehouse:
     +schema: silver
+
+data_tests:
+  rail_lakehouse:
+    +store_failures: true   # lignes fautives conservées dans <schéma>_dq pour analyse
+    +schema: dq

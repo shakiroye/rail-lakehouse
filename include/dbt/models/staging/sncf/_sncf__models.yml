@@ -1,26 +1,79 @@
 version: 2
 
+# Sévérité : error = défaut qui fausserait le modèle (bloque le pipeline),
+#            warn  = anomalie connue de la source, signalée sans bloquer (voir docs/exploration.md)
+
 models:
   - name: stg_sncf__regularite_tgv
     description: >
       Régularité TGV typée et nettoyée. Grain : un mois x un service x une liaison (gare de départ, gare d'arrivée).
       Seul le dernier fichier chargé en bronze est conservé : il contient tout l'historique et intègre les corrections de la source.
       Les colonnes de commentaires et le retard moyen « si liaison concurrencée par vol » sont écartés (voir docs/exploration.md).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mois, service, gare_depart, gare_arrivee]
+      # Un fichier tronqué (ex. commentaires multilignes mal lus) ferait chuter le volume
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          name: stg_regularite_volume_minimum
+          arguments:
+            min_value: 10000
+      - dbt_utils.expression_is_true:
+          name: stg_regularite_causes_somme_100
+          arguments:
+            expression: >
+              abs(pct_cause_externe + pct_cause_infrastructure + pct_cause_gestion_trafic
+                + pct_cause_materiel_roulant + pct_cause_gestion_gare + pct_cause_prise_en_charge_voyageurs
+                - 100) <= 1
+          config:
+            where: "nb_trains_retard_arrivee > 0"
+            severity: warn   # 89 lignes : causes à 0 de 2018-05 à 2018-08
+      - dbt_utils.expression_is_true:
+          name: stg_regularite_annulations_inf_prevus
+          arguments:
+            expression: "nb_annulations <= nb_trains_prevus"
+          config:
+            severity: warn   # 63 lignes : liaisons suspendues d'avril à juin 2020
+      - dbt_utils.expression_is_true:
+          name: stg_regularite_duree_positive
+          arguments:
+            expression: "duree_moyenne_min > 0"
+          config:
+            where: "nb_trains_prevus > 0"
+            severity: warn
     columns:
       - name: mois
         description: "Premier jour du mois observé"
+        data_tests:
+          - not_null
       - name: service
         description: "NATIONAL ou INTERNATIONAL. Une même liaison peut changer de service (Paris Lyon - Barcelona en 2025-10)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['NATIONAL', 'INTERNATIONAL']
       - name: gare_depart
         description: "Nom normalisé de la gare de départ (majuscules, espaces simples)"
+        data_tests:
+          - not_null
       - name: gare_arrivee
         description: "Nom normalisé de la gare d'arrivée (majuscules, espaces simples)"
+        data_tests:
+          - not_null
       - name: duree_moyenne_min
         description: "Durée moyenne du trajet, en minutes. Vaut 0 quand aucun train n'était prévu (2020)."
       - name: nb_trains_prevus
         description: "Nombre de trains programmés sur la liaison ce mois-là"
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
       - name: nb_annulations
         description: "Nombre de trains annulés. Peut dépasser nb_trains_prevus quand la liaison est suspendue (avril à juin 2020)."
+        data_tests:
+          - not_null
       - name: nb_trains_retard_depart
         description: "Nombre de trains partis en retard"
       - name: retard_moyen_depart_min
@@ -29,28 +82,55 @@ models:
         description: "Retard moyen au départ de tous les trains, en minutes. Négatif quand les trains partent en avance."
       - name: nb_trains_retard_arrivee
         description: "Nombre de trains arrivés en retard"
+        data_tests:
+          - not_null
       - name: retard_moyen_arrivee_min
         description: "Retard moyen à l'arrivée des seuls trains en retard, en minutes : quand un train est en retard, de combien ?"
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              name: stg_regularite_retard_moyen_positif
+              arguments:
+                min_value: 0
+              config:
+                severity: warn   # 2 lignes négatives dans la source
       - name: retard_moyen_tous_trains_arrivee_min
         description: "Retard moyen à l'arrivée de tous les trains, en minutes. Négatif quand les trains arrivent en avance."
       - name: nb_trains_retard_sup_15
         description: "Nombre de trains arrivés avec plus de 15 minutes de retard"
       - name: nb_trains_retard_sup_30
         description: "Nombre de trains arrivés avec plus de 30 minutes de retard. Inexploitable de 2025-01 à 2025-03 (valeurs négatives ou inférieures au seuil 60 min)."
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              name: stg_regularite_retard_sup_30_positif
+              arguments:
+                min_value: 0
+              config:
+                severity: warn   # 43 lignes négatives au T1 2025
       - name: nb_trains_retard_sup_60
         description: "Nombre de trains arrivés avec plus de 60 minutes de retard"
       - name: pct_cause_externe
         description: "Part des retards due à des causes externes (météo, obstacles, malveillance, mouvements sociaux...), en %"
+        data_tests: &pourcentage
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
       - name: pct_cause_infrastructure
         description: "Part des retards due à l'infrastructure (travaux, voies, signalisation...), en %"
+        data_tests: *pourcentage
       - name: pct_cause_gestion_trafic
         description: "Part des retards due à la gestion du trafic (circulation, interactions entre réseaux...), en %"
+        data_tests: *pourcentage
       - name: pct_cause_materiel_roulant
         description: "Part des retards due au matériel roulant, en %"
+        data_tests: *pourcentage
       - name: pct_cause_gestion_gare
         description: "Part des retards due à la gestion en gare et à la réutilisation de matériel, en %"
+        data_tests: *pourcentage
       - name: pct_cause_prise_en_charge_voyageurs
         description: "Part des retards due à la prise en charge des voyageurs (affluence, personnes à mobilité réduite, correspondances), en %"
+        data_tests: *pourcentage
       - name: _source_file
         description: "Chemin du fichier chargé en bronze (dernier instantané)"
       - name: _ingested_at
