@@ -42,8 +42,11 @@ models:
                 to: ref('dim_gare')
                 field: gare_id
       - name: libelle_liaison
-        description: "Libellé lisible : « GARE DE DÉPART > GARE D'ARRIVÉE »"
-        data_tests: [not_null]
+        description: >
+          Libellé lisible et unique : « GARE DE DÉPART > GARE D'ARRIVÉE ». Quand un même trajet existe dans les deux services,
+          la version internationale est suffixée « (international) ». Unique pour que les visuels groupés par libellé
+          ne fusionnent pas deux liaisons.
+        data_tests: [unique, not_null]
       - name: duree_moyenne_min
         description: "Durée moyenne du trajet la plus récente connue, en minutes (mois sans train exclus)"
       - name: premier_mois

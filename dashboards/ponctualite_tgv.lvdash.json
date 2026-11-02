@@ -1,0 +1,1013 @@
+{
+  "datasets": [
+    {
+      "name": "regularite_mensuelle",
+      "displayName": "Régularité mensuelle par service",
+      "config": {
+        "source": "SELECT f.mois,\n       f.liaison_id,\n       f.nb_trains_prevus,\n       f.nb_annulations,\n       f.nb_trains_circules,\n       f.nb_trains_retard_arrivee,\n       l.service\nFROM workspace.gold.fct_regularite_mensuelle f\nJOIN workspace.gold.dim_liaison l ON f.liaison_id = l.liaison_id\n",
+        "measures": [
+          {
+            "displayName": "Ponctualité à l'arrivée",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "taux_ponctualite",
+            "expr": "1 - try_divide(sum(nb_trains_retard_arrivee), sum(nb_trains_circules))",
+            "comment": "1 - somme des retards à l'arrivée / somme des trains circulés (moyenne pondérée, jamais une moyenne de taux)"
+          },
+          {
+            "displayName": "Taux d'annulation",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "taux_annulation",
+            "expr": "try_divide(sum(nb_annulations), sum(nb_trains_prevus))",
+            "comment": "Somme des annulations / somme des trains prévus, recalculé après chaque filtre"
+          }
+        ],
+        "version": "1.1",
+        "comment": "Faits mensuels x liaison avec le service. Les taux sont recalculés par sommes pondérées après chaque filtre.",
+        "dimensions": [
+          {
+            "displayName": "Mois",
+            "format": {
+              "type": "date",
+              "dateFormat": "locale_short_month"
+            },
+            "name": "mois",
+            "expr": "mois",
+            "comment": "Premier jour du mois observé"
+          },
+          {
+            "name": "annee",
+            "expr": "year(mois)",
+            "displayName": "Année"
+          },
+          {
+            "name": "service",
+            "expr": "service",
+            "displayName": "Service",
+            "comment": "NATIONAL ou INTERNATIONAL"
+          }
+        ]
+      }
+    },
+    {
+      "name": "classement_liaisons",
+      "displayName": "Classement annuel des liaisons",
+      "config": {
+        "source": "SELECT annee,\n       service,\n       libelle_liaison,\n       rang_moins_ponctuelle,\n       nb_trains_circules,\n       nb_trains_prevus,\n       nb_annulations,\n       nb_trains_retard_arrivee,\n       taux_ponctualite_arrivee,\n       taux_annulation,\n       est_comparable,\n       contains(lower(libelle_liaison), 'stuttgart') AS est_liaison_vedette\nFROM workspace.gold.mart_ponctualite_liaison_annuelle\n",
+        "measures": [
+          {
+            "displayName": "Ponctualité à l'arrivée",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "taux_ponctualite",
+            "expr": "1 - try_divide(sum(nb_trains_retard_arrivee), sum(nb_trains_circules))",
+            "comment": "Ponctualité recalculée par sommes pondérées après filtres"
+          },
+          {
+            "displayName": "Taux d'annulation",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "taux_annulation_calcule",
+            "expr": "try_divide(sum(nb_annulations), sum(nb_trains_prevus))",
+            "comment": "Annulations / trains prévus, recalculé par sommes pondérées"
+          }
+        ],
+        "filter": "est_comparable = true",
+        "version": "1.1",
+        "comment": "Liaisons comparables (au moins 200 trains circulés). La liaison Paris Est > Stuttgart est marquée pour mise en avant.",
+        "dimensions": [
+          {
+            "name": "annee",
+            "expr": "annee",
+            "displayName": "Année"
+          },
+          {
+            "name": "service",
+            "expr": "service",
+            "displayName": "Service"
+          },
+          {
+            "name": "libelle_liaison",
+            "expr": "libelle_liaison",
+            "displayName": "Liaison"
+          },
+          {
+            "name": "rang_moins_ponctuelle",
+            "expr": "rang_moins_ponctuelle",
+            "displayName": "Rang de ponctualité",
+            "comment": "1 = la moins ponctuelle des liaisons comparables de l'année"
+          },
+          {
+            "name": "nb_trains_circules",
+            "expr": "nb_trains_circules",
+            "displayName": "Trains circulés",
+            "format": {
+              "type": "number"
+            }
+          },
+          {
+            "displayName": "Ponctualité à l'arrivée",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "taux_ponctualite_arrivee",
+            "expr": "taux_ponctualite_arrivee",
+            "comment": "Taux stocké au grain année x liaison (moyenne pondérée)"
+          },
+          {
+            "name": "taux_annulation",
+            "expr": "taux_annulation",
+            "displayName": "Taux d'annulation",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "est_liaison_vedette",
+            "expr": "est_liaison_vedette",
+            "comment": "Vrai pour la liaison Paris Est > Stuttgart mise en avant"
+          }
+        ]
+      }
+    },
+    {
+      "name": "causes_retard",
+      "displayName": "Causes de retard par année",
+      "config": {
+        "source": "SELECT c.mois,\n       c.cause,\n       c.nb_trains_retard_attribues,\n       l.service\nFROM workspace.gold.mart_causes_retard c\nJOIN workspace.gold.dim_liaison l ON c.liaison_id = l.liaison_id\n",
+        "measures": [
+          {
+            "displayName": "Trains en retard attribués",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            },
+            "name": "nb_trains_retard",
+            "expr": "sum(nb_trains_retard_attribues)",
+            "comment": "Somme des trains en retard attribués à la cause"
+          }
+        ],
+        "version": "1.1",
+        "comment": "Trains en retard attribués par cause (grain mois x liaison x cause), service récupéré via dim_liaison.",
+        "dimensions": [
+          {
+            "name": "annee",
+            "expr": "year(mois)",
+            "displayName": "Année"
+          },
+          {
+            "name": "cause",
+            "expr": "cause",
+            "displayName": "Cause de retard"
+          },
+          {
+            "name": "service",
+            "expr": "service",
+            "displayName": "Service"
+          }
+        ]
+      }
+    },
+    {
+      "name": "top10_liaisons",
+      "displayName": "Top 10 des liaisons les moins ponctuelles",
+      "queryLines": [
+        "SELECT\n",
+        "  annee,\n",
+        "  service,\n",
+        "  libelle_liaison,\n",
+        "  taux_ponctualite_arrivee\n",
+        "FROM\n",
+        "  workspace.gold.mart_ponctualite_liaison_annuelle\n",
+        "WHERE\n",
+        "  est_comparable\n",
+        "  AND rang_moins_ponctuelle <= 10"
+      ],
+      "columns": [
+        {
+          "displayName": "est_liaison_vedette",
+          "description": "Vrai pour la liaison Paris Est > Stuttgart mise en avant en orange dans le classement",
+          "expression": "contains(lower(`libelle_liaison`), 'stuttgart')"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "2f2be4c7",
+      "displayName": "Vue d'ensemble",
+      "layout": [
+        {
+          "widget": {
+            "name": "compteur_ponctualite",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "regularite_mensuelle",
+                  "fields": [
+                    {
+                      "name": "measure(taux_ponctualite)",
+                      "expression": "MEASURE(`taux_ponctualite`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Ponctualité à l'arrivée"
+              },
+              "sparkChart": {
+                "hide": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(taux_ponctualite)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "compteur_annulation",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "regularite_mensuelle",
+                  "fields": [
+                    {
+                      "name": "measure(taux_annulation)",
+                      "expression": "MEASURE(`taux_annulation`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Taux d'annulation"
+              },
+              "sparkChart": {
+                "hide": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(taux_annulation)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "tendance_ponctualite",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "regularite_mensuelle",
+                  "fields": [
+                    {
+                      "name": "service",
+                      "expression": "`service`"
+                    },
+                    {
+                      "name": "mois",
+                      "expression": "`mois`"
+                    },
+                    {
+                      "name": "measure(taux_ponctualite)",
+                      "expression": "MEASURE(`taux_ponctualite`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "La ponctualité recule en 2026 : 81,3 % de janvier à septembre, contre 85,7 % un an plus tôt",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "mois",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(taux_ponctualite)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "service",
+                  "legend": {
+                    "title": "Service"
+                  },
+                  "scale": {
+                    "mappings": [
+                      {
+                        "value": "INTERNATIONAL",
+                        "color": "#E8730C"
+                      },
+                      {
+                        "value": "NATIONAL",
+                        "color": "#55606A"
+                      }
+                    ],
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            },
+            "filterSources": {
+              "mode": "EXCLUDE",
+              "global": {
+                "names": [
+                  "filtre_annee"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "causes_retard",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "causes_retard",
+                  "fields": [
+                    {
+                      "name": "cause",
+                      "expression": "`cause`"
+                    },
+                    {
+                      "name": "annee",
+                      "expression": "`annee`"
+                    },
+                    {
+                      "name": "measure(nb_trains_retard)",
+                      "expression": "MEASURE(`nb_trains_retard`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "La gestion du trafic est devenue la première cause de retard (24,5 % en 2025)",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "percent-stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "annee",
+                  "axis": {
+                    "title": "Année"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(nb_trains_retard)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "cause",
+                  "legend": {
+                    "title": "Cause de retard"
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Gestion du trafic",
+                        "color": "#E8730C"
+                      },
+                      {
+                        "value": "Externe",
+                        "color": "#9AA4AC"
+                      },
+                      {
+                        "value": "Infrastructure",
+                        "color": "#7B8794"
+                      },
+                      {
+                        "value": "Matériel roulant",
+                        "color": "#B4BAC1"
+                      },
+                      {
+                        "value": "Gestion en gare",
+                        "color": "#CDD2D7"
+                      },
+                      {
+                        "value": "Prise en charge voyageurs",
+                        "color": "#E1E5E8"
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "detail_liaisons",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "classement_liaisons",
+                  "fields": [
+                    {
+                      "name": "annee",
+                      "expression": "`annee`"
+                    },
+                    {
+                      "name": "service",
+                      "expression": "`service`"
+                    },
+                    {
+                      "name": "libelle_liaison",
+                      "expression": "`libelle_liaison`"
+                    },
+                    {
+                      "name": "rang_moins_ponctuelle",
+                      "expression": "`rang_moins_ponctuelle`"
+                    },
+                    {
+                      "name": "nb_trains_circules",
+                      "expression": "`nb_trains_circules`"
+                    },
+                    {
+                      "name": "taux_ponctualite_arrivee",
+                      "expression": "`taux_ponctualite_arrivee`"
+                    },
+                    {
+                      "name": "taux_annulation",
+                      "expression": "`taux_annulation`"
+                    }
+                  ],
+                  "disaggregated": true,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`rang_moins_ponctuelle`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Détail par liaison"
+              },
+              "rowsPerPage": 25,
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "annee",
+                    "displayName": "Année"
+                  },
+                  {
+                    "fieldName": "service",
+                    "displayName": "Service"
+                  },
+                  {
+                    "fieldName": "libelle_liaison",
+                    "displayName": "Liaison"
+                  },
+                  {
+                    "fieldName": "rang_moins_ponctuelle",
+                    "headerAlignment": "right",
+                    "displayName": "Rang"
+                  },
+                  {
+                    "fieldName": "nb_trains_circules",
+                    "headerAlignment": "right",
+                    "displayName": "Trains circulés"
+                  },
+                  {
+                    "fieldName": "taux_ponctualite_arrivee",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    },
+                    "headerAlignment": "right",
+                    "displayName": "Ponctualité à l'arrivée"
+                  },
+                  {
+                    "fieldName": "taux_annulation",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    },
+                    "headerAlignment": "right",
+                    "displayName": "Taux d'annulation"
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column",
+                    "field": {
+                      "index": 3
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "pied_page",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Source : AQST / SNCF, Régularité mensuelle TGV par liaisons, licence ODbL. Indicateurs calculés par liaison : un même train peut être compté sur plusieurs liaisons, ces chiffres ne sont pas le taux de ponctualité officiel du TGV. Avril à juin 2020 sont atypiques (confinement)."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "top10_liaisons",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "top10_liaisons",
+                  "fields": [
+                    {
+                      "name": "est_liaison_vedette",
+                      "expression": "`est_liaison_vedette`"
+                    },
+                    {
+                      "name": "max(taux_ponctualite_arrivee)",
+                      "expression": "MAX(`taux_ponctualite_arrivee`)"
+                    },
+                    {
+                      "name": "libelle_liaison",
+                      "expression": "`libelle_liaison`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Paris Est → Stuttgart, liaison la moins ponctuelle de 2025 : 43,5 % de trains à l'heure"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "max(taux_ponctualite_arrivee)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Ponctualité à l'arrivée",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "libelle_liaison",
+                  "axis": {
+                    "title": "Liaison"
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 10
+                    },
+                    "sort": {
+                      "by": "x"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "est_liaison_vedette",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": true,
+                        "color": "#E8730C"
+                      },
+                      {
+                        "value": false,
+                        "color": "#B4BAC1"
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "filtre_service",
+            "queries": [
+              {
+                "name": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc6681722a8be06114fc37144_service",
+                "query": {
+                  "datasetName": "regularite_mensuelle",
+                  "fields": [
+                    {
+                      "name": "service",
+                      "expression": "`service`"
+                    },
+                    {
+                      "name": "service_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc7551b64b3bc6f41daa82747_service",
+                "query": {
+                  "datasetName": "classement_liaisons",
+                  "fields": [
+                    {
+                      "name": "service",
+                      "expression": "`service`"
+                    },
+                    {
+                      "name": "service_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bf6335169bac78c83a3112a041_service",
+                "query": {
+                  "datasetName": "top10_liaisons",
+                  "fields": [
+                    {
+                      "name": "service",
+                      "expression": "`service`"
+                    },
+                    {
+                      "name": "service_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc83d11b3a6ee01c06278b86d_service",
+                "query": {
+                  "datasetName": "causes_retard",
+                  "fields": [
+                    {
+                      "name": "service",
+                      "expression": "`service`"
+                    },
+                    {
+                      "name": "service_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "scale": {
+                "type": "categorical",
+                "sort": {
+                  "by": "natural-order"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Service"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "service",
+                    "queryName": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc6681722a8be06114fc37144_service"
+                  },
+                  {
+                    "fieldName": "service",
+                    "queryName": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc7551b64b3bc6f41daa82747_service"
+                  },
+                  {
+                    "fieldName": "service",
+                    "queryName": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bf6335169bac78c83a3112a041_service"
+                  },
+                  {
+                    "fieldName": "service",
+                    "queryName": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc83d11b3a6ee01c06278b86d_service"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtre_annee",
+            "queries": [
+              {
+                "name": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc6681722a8be06114fc37144_annee",
+                "query": {
+                  "datasetName": "regularite_mensuelle",
+                  "fields": [
+                    {
+                      "name": "annee",
+                      "expression": "`annee`"
+                    },
+                    {
+                      "name": "annee_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc7551b64b3bc6f41daa82747_annee",
+                "query": {
+                  "datasetName": "classement_liaisons",
+                  "fields": [
+                    {
+                      "name": "annee",
+                      "expression": "`annee`"
+                    },
+                    {
+                      "name": "annee_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bf6335169bac78c83a3112a041_annee",
+                "query": {
+                  "datasetName": "top10_liaisons",
+                  "fields": [
+                    {
+                      "name": "annee",
+                      "expression": "`annee`"
+                    },
+                    {
+                      "name": "annee_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "scale": {
+                "sort": {
+                  "by": "natural-order-reversed"
+                },
+                "type": "categorical"
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "INTEGER",
+                    "values": [
+                      {
+                        "value": "2025"
+                      }
+                    ]
+                  }
+                }
+              },
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Année"
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "annee",
+                    "queryName": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc6681722a8be06114fc37144_annee"
+                  },
+                  {
+                    "fieldName": "annee",
+                    "queryName": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bdc7551b64b3bc6f41daa82747_annee"
+                  },
+                  {
+                    "fieldName": "annee",
+                    "queryName": "dashboards/01f1d6bcd79e17ccb8ad879e45c1c0a9/datasets/01f1d6bf6335169bac78c83a3112a041_annee"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
