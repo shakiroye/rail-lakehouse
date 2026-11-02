@@ -10,6 +10,9 @@ python-dotenv==1.2.4
 # Transformation
 dbt-databricks==1.13.0
 
+# Lint SQL
+sqlfluff==4.5.0
+
 # Tests
 pytest==9.2.0
 requests-mock==1.12.1

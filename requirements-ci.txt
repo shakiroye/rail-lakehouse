@@ -1,0 +1,8 @@
+# Dépendances de la CI GitHub Actions (tests Python, lint SQL, dbt)
+dbt-databricks==1.13.0
+databricks-sdk==0.117.0
+databricks-sql-connector==4.4.0
+requests==2.34.2
+pytest==9.2.0
+requests-mock==1.12.1
+sqlfluff==4.5.0
