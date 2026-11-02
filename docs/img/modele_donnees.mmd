@@ -1,0 +1,35 @@
+erDiagram
+    dim_gare {
+        string gare_id PK
+        string nom_gare
+        boolean est_gare_parisienne
+    }
+    dim_liaison {
+        string liaison_id PK
+        string service
+        string gare_depart_id FK
+        string gare_arrivee_id FK
+        string libelle_liaison "unique"
+        int duree_moyenne_min
+    }
+    dim_mois {
+        date mois PK
+        int annee
+        int trimestre
+        string libelle_mois
+    }
+    fct_regularite_mensuelle {
+        string liaison_id PK, FK
+        date mois PK, FK
+        int nb_trains_prevus
+        int nb_annulations
+        int nb_trains_circules
+        int nb_trains_retard_arrivee
+        double taux_ponctualite_arrivee
+        double taux_annulation
+        string cause_dominante
+        double pct_cause_x6 "6 causes"
+    }
+    dim_gare ||--o{ dim_liaison : "départ / arrivée"
+    dim_liaison ||--o{ fct_regularite_mensuelle : "liaison_id"
+    dim_mois ||--o{ fct_regularite_mensuelle : "mois"
