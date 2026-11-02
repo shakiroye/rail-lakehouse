@@ -32,6 +32,6 @@ select
 from {{ ref('int_regularite__indicateurs') }}
 
 {% if is_incremental() %}
-  -- la SNCF peut corriger les derniers mois publiés : on retraite une fenêtre glissante
-  where mois >= (select add_months(max(mois), -{{ var('lookback_mois', 3) }}) from {{ this }})
+    -- la SNCF peut corriger les derniers mois publiés : on retraite une fenêtre glissante
+    where mois >= (select add_months(max(existant.mois), -{{ var('lookback_mois', 3) }}) from {{ this }} as existant)
 {% endif %}

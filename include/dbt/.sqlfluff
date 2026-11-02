@@ -1,0 +1,15 @@
+[sqlfluff]
+dialect = databricks
+templater = jinja
+max_line_length = 120
+# AM04 : "select *" est l'idiome dbt dans les CTE ; ST06 : l'ordre des colonnes suit la logique métier
+exclude_rules = AM04, ST06
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True
+load_macros_from_path = macros
+# Versions factices des macros de packages (dbt_utils...) : dbt_packages n'existe pas au moment du lint
+library_path = sqlfluff_libs
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower

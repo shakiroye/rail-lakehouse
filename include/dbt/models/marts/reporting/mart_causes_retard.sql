@@ -4,12 +4,13 @@ with causes as (
         liaison_id,
         mois,
         nb_trains_retard_arrivee,
-        stack(6,
-            'Externe',                   pct_cause_externe,
-            'Infrastructure',            pct_cause_infrastructure,
-            'Gestion du trafic',         pct_cause_gestion_trafic,
-            'Matériel roulant',          pct_cause_materiel_roulant,
-            'Gestion en gare',           pct_cause_gestion_gare,
+        stack(
+            6,
+            'Externe', pct_cause_externe,
+            'Infrastructure', pct_cause_infrastructure,
+            'Gestion du trafic', pct_cause_gestion_trafic,
+            'Matériel roulant', pct_cause_materiel_roulant,
+            'Gestion en gare', pct_cause_gestion_gare,
             'Prise en charge voyageurs', pct_cause_prise_en_charge_voyageurs
         ) as (cause, pct_cause)
     from {{ ref('fct_regularite_mensuelle') }}

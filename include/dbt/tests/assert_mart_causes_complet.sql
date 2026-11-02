@@ -10,7 +10,7 @@ mart as (
 
 select
     fct.lignes * 6 as lignes_attendues,
-    mart.lignes    as lignes_mart
+    mart.lignes as lignes_mart
 from fct
 cross join mart
 where fct.lignes * 6 != mart.lignes

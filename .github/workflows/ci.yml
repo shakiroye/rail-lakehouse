@@ -1,0 +1,48 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DATABRICKS_CATALOG: workspace
+      # Schémas isolés par PR : ci_pr_12, ci_pr_12_silver, ci_pr_12_gold, ci_pr_12_dq
+      DBT_CI_SCHEMA: ci_pr_${{ github.event.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Installer les dépendances
+        run: pip install -r requirements-ci.txt
+
+      - name: Tests Python de l'ingestion
+        run: pytest tests/test_sncf.py -v
+
+      - name: Lint SQL
+        working-directory: include/dbt
+        run: sqlfluff lint models tests
+
+      - name: dbt build dans un schéma isolé
+        working-directory: include/dbt
+        run: |
+          dbt deps
+          dbt build --target ci --profiles-dir .
+
+      - name: Nettoyage des schémas CI
+        if: always()
+        working-directory: include/dbt
+        run: dbt run-operation drop_ci_schemas --target ci --profiles-dir .
