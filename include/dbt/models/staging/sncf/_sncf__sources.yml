@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: sncf
+    description: "Open data SNCF chargé tel quel dans la couche bronze par include/ingestion/sncf.py"
+    database: "{{ env_var('DATABRICKS_CATALOG', 'workspace') }}"   # sur Databricks, database = catalogue
+    schema: bronze
+    tables:
+      - name: regularite_tgv
+        description: >
+          Régularité mensuelle TGV par liaison (AQST / SNCF, licence ODbL).
+          Chaque fichier contient tout l'historique : une ligne bronze = un mois x un service x une liaison x un fichier chargé.
+          Toutes les colonnes sont en STRING, le typage se fait en staging.
+        config:
+          loaded_at_field: _ingested_at
+          freshness:   # publication mensuelle
+            warn_after: {count: 35, period: day}
+            error_after: {count: 45, period: day}

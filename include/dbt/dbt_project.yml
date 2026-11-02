@@ -1,0 +1,29 @@
+name: rail_lakehouse
+version: "1.0.0"
+profile: rail_lakehouse
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+snapshot-paths: ["snapshots"]
+
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  rail_lakehouse:
+    +persist_docs: {relation: true, columns: true}   # descriptions visibles dans Unity Catalog
+    staging:
+      +schema: silver
+      +materialized: view
+    intermediate:
+      +schema: silver
+      +materialized: ephemeral
+    marts:
+      +schema: gold
+      +materialized: table
+
+seeds:
+  rail_lakehouse:
+    +schema: silver

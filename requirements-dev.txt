@@ -2,10 +2,13 @@
 # Les dépendances de l'image Airflow sont dans requirements.txt
 
 # Ingestion
-databricks-sdk==0.158.0
-databricks-sql-connector==4.8.0
+databricks-sdk==0.117.0
+databricks-sql-connector==4.4.0
 requests==2.34.2
 python-dotenv==1.2.4
+
+# Transformation
+dbt-databricks==1.13.0
 
 # Tests
 pytest==9.2.0

@@ -17,3 +17,9 @@ airflow.db
 **/.astro/dbt_metadata.json
 **/.astro/*manifest*.slim.json
 .pytest_cache/
+
+# dbt
+include/dbt/target/
+include/dbt/dbt_packages/
+include/dbt/logs/
+logs/
