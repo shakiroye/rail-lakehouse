@@ -1,0 +1,103 @@
+version: 2
+
+models:
+  - name: dim_gare
+    description: "Une ligne par gare citée comme départ ou arrivée d'une liaison."
+    columns:
+      - name: gare_id
+        description: "Clé de substitution : hash du nom normalisé de la gare"
+      - name: nom_gare
+        description: "Nom normalisé de la gare. Certaines entrées regroupent plusieurs gares (ITALIE)."
+      - name: est_gare_parisienne
+        description: "Vrai si le nom commence par PARIS"
+
+  - name: dim_liaison
+    description: >
+      Une ligne par liaison : service x gare de départ x gare d'arrivée.
+      Une même relation peut donner deux liaisons si elle change de service (Paris Lyon - Barcelona, International puis National en 2025-10).
+    columns:
+      - name: liaison_id
+        description: "Clé de substitution : hash de (service, gare_depart, gare_arrivee)"
+      - name: service
+        description: "NATIONAL ou INTERNATIONAL"
+      - name: gare_depart_id
+        description: "Clé de la gare de départ (dim_gare)"
+      - name: gare_arrivee_id
+        description: "Clé de la gare d'arrivée (dim_gare)"
+      - name: libelle_liaison
+        description: "Libellé lisible : « GARE DE DÉPART > GARE D'ARRIVÉE »"
+      - name: duree_moyenne_min
+        description: "Durée moyenne du trajet la plus récente connue, en minutes (mois sans train exclus)"
+      - name: premier_mois
+        description: "Premier mois où la liaison apparaît dans la source"
+      - name: dernier_mois
+        description: "Dernier mois où la liaison apparaît dans la source"
+
+  - name: dim_mois
+    description: "Calendrier mensuel généré par dbt_utils.date_spine, de 2018-01 au mois courant."
+    columns:
+      - name: mois
+        description: "Premier jour du mois"
+      - name: annee
+        description: "Année"
+      - name: trimestre
+        description: "Trimestre (1 à 4)"
+      - name: num_mois
+        description: "Numéro du mois (1 à 12)"
+      - name: libelle_mois
+        description: "Libellé en français, par exemple « janvier 2025 »"
+      - name: est_ete
+        description: "Vrai en juillet et en août"
+
+  - name: fct_regularite_mensuelle
+    description: >
+      Faits de régularité. Grain : un mois x une liaison.
+      Incrémental (merge sur liaison_id et mois) : chaque exécution retraite les 3 derniers mois connus
+      (variable lookback_mois) pour intégrer les corrections de la source. --full-refresh reconstruit tout.
+    columns:
+      - name: liaison_id
+        description: "Clé de la liaison (dim_liaison)"
+      - name: gare_depart_id
+        description: "Clé de la gare de départ (dim_gare)"
+      - name: gare_arrivee_id
+        description: "Clé de la gare d'arrivée (dim_gare)"
+      - name: mois
+        description: "Premier jour du mois observé (dim_mois)"
+      - name: nb_trains_prevus
+        description: "Nombre de trains programmés"
+      - name: nb_annulations
+        description: "Nombre de trains annulés"
+      - name: nb_trains_circules
+        description: "Trains prévus moins trains annulés, borné à 0"
+      - name: nb_trains_retard_arrivee
+        description: "Nombre de trains arrivés en retard"
+      - name: nb_trains_retard_sup_15
+        description: "Nombre de trains arrivés avec plus de 15 minutes de retard"
+      - name: nb_trains_retard_sup_30
+        description: "Nombre de trains arrivés avec plus de 30 minutes de retard (non fiable de 2025-01 à 2025-03)"
+      - name: nb_trains_retard_sup_60
+        description: "Nombre de trains arrivés avec plus de 60 minutes de retard"
+      - name: retard_moyen_arrivee_min
+        description: "Retard moyen à l'arrivée des seuls trains en retard, en minutes"
+      - name: taux_annulation
+        description: "nb_annulations / nb_trains_prevus"
+      - name: taux_ponctualite_arrivee
+        description: "1 - nb_trains_retard_arrivee / nb_trains_circules"
+      - name: part_retards_sup_30
+        description: "nb_trains_retard_sup_30 / nb_trains_circules"
+      - name: cause_dominante
+        description: "Cause de retard au pourcentage le plus élevé, NULL sans retard ou sans cause renseignée"
+      - name: pct_cause_externe
+        description: "Part des retards due à des causes externes, en %"
+      - name: pct_cause_infrastructure
+        description: "Part des retards due à l'infrastructure, en %"
+      - name: pct_cause_gestion_trafic
+        description: "Part des retards due à la gestion du trafic, en %"
+      - name: pct_cause_materiel_roulant
+        description: "Part des retards due au matériel roulant, en %"
+      - name: pct_cause_gestion_gare
+        description: "Part des retards due à la gestion en gare et à la réutilisation de matériel, en %"
+      - name: pct_cause_prise_en_charge_voyageurs
+        description: "Part des retards due à la prise en charge des voyageurs, en %"
+      - name: _dbt_updated_at
+        description: "Date et heure de la dernière écriture de la ligne par dbt"

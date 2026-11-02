@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: mart_ponctualite_liaison_annuelle
+    description: >
+      Ponctualité annuelle par liaison, pour le classement du dashboard. Grain : une année x une liaison.
+      Les taux sont des moyennes pondérées (somme des numérateurs / somme des dénominateurs), jamais des moyennes de taux.
+      Le classement ne porte que sur les liaisons comparables (au moins 200 trains circulés dans l'année,
+      seuil réglable via la variable seuil_trains_comparables).
+    columns:
+      - name: annee
+        description: "Année"
+      - name: liaison_id
+        description: "Clé de la liaison (dim_liaison)"
+      - name: libelle_liaison
+        description: "Libellé lisible de la liaison"
+      - name: service
+        description: "NATIONAL ou INTERNATIONAL"
+      - name: nb_trains_prevus
+        description: "Trains programmés sur l'année"
+      - name: nb_trains_circules
+        description: "Trains circulés sur l'année"
+      - name: nb_annulations
+        description: "Trains annulés sur l'année"
+      - name: nb_trains_retard_arrivee
+        description: "Trains arrivés en retard sur l'année"
+      - name: taux_annulation
+        description: "Annulations / trains prévus sur l'année"
+      - name: taux_ponctualite_arrivee
+        description: "1 - trains en retard / trains circulés sur l'année"
+      - name: part_retards_sup_30
+        description: "Trains en retard de plus de 30 min / trains circulés (sous-estimée en 2025, données du T1 non fiables)"
+      - name: est_comparable
+        description: "Vrai si la liaison compte au moins 200 trains circulés dans l'année (variable seuil_trains_comparables)"
+      - name: rang_moins_ponctuelle
+        description: "Rang de la liaison dans l'année parmi les liaisons comparables, 1 = la moins ponctuelle. NULL si la liaison n'est pas comparable."
+
+  - name: mart_causes_retard
+    description: >
+      Causes de retard dépivotées pour les graphiques. Grain : un mois x une liaison x une cause.
+      Les mois où toutes les causes valent 0 (2018-05 à 2018-08) donnent 0 train attribué.
+    columns:
+      - name: liaison_id
+        description: "Clé de la liaison (dim_liaison)"
+      - name: mois
+        description: "Premier jour du mois observé"
+      - name: cause
+        description: "Libellé de la cause de retard"
+      - name: pct_cause
+        description: "Part des retards due à cette cause, en %"
+      - name: nb_trains_retard_attribues
+        description: "Trains en retard à l'arrivée x part de la cause, arrondi à 0,1"

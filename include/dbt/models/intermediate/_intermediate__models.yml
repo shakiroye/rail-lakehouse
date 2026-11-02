@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: int_regularite__indicateurs
+    description: >
+      Staging enrichi des clés de substitution et des indicateurs métier, calculés une seule fois pour tous les marts.
+      Grain : un mois x un service x une liaison. Matérialisé en ephemeral (CTE injectée dans les modèles en aval).
+    columns:
+      - name: liaison_id
+        description: "Clé de substitution de la liaison : hash de (service, gare_depart, gare_arrivee)"
+      - name: gare_depart_id
+        description: "Clé de substitution de la gare de départ : hash du nom normalisé"
+      - name: gare_arrivee_id
+        description: "Clé de substitution de la gare d'arrivée : hash du nom normalisé"
+      - name: nb_trains_circules
+        description: "Trains prévus moins trains annulés, borné à 0 (la source compte des annulations sur des liaisons suspendues en 2020)"
+      - name: taux_annulation
+        description: "nb_annulations / nb_trains_prevus. NULL quand aucun train n'est prévu."
+      - name: taux_ponctualite_arrivee
+        description: "1 - nb_trains_retard_arrivee / nb_trains_circules. NULL quand aucun train n'a circulé."
+      - name: part_retards_sup_30
+        description: "nb_trains_retard_sup_30 / nb_trains_circules. Non fiable de 2025-01 à 2025-03."
+      - name: cause_dominante
+        description: "Cause dont le pourcentage est le plus élevé. NULL sans retard, ou quand toutes les causes valent 0."
